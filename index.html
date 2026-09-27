@@ -196,6 +196,7 @@ ul.items .m{font-size:11px;color:var(--muted)}
       <option value="award">賞状（A4横・縦書き）</option>
       <option value="nametag">名札（A4・10面）</option>
       <option value="notice">お知らせ文書（A4縦）</option>
+      <option value="hagaki">はがき宛名（縦書き）</option>
       <option value="blank">白紙から</option>
     </select>
     <button class="btn icon" id="btnUndo" title="元に戻す（Ctrl+Z）" aria-label="元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
@@ -292,6 +293,15 @@ ul.items .m{font-size:11px;color:var(--muted)}
         <select id="oDpi"><option value="200">標準（200dpi・速い）</option><option value="300">高画質（300dpi）</option></select>
       </label>
       <p class="hint">印刷画面では「余白：なし」「倍率：100%（実際のサイズ）」を選ぶと位置がずれません。</p>
+
+      <h3>印刷位置の補正</h3>
+      <p class="hint">プリンタによっては、全体が1〜2mmずれて印刷されます。まず「テスト印刷」で十字を印刷し、定規で測ってずれた分を入れてください。</p>
+      <div class="grid2">
+        <label>右へずらす（mm）<input type="number" id="oDX" min="-20" max="20" step="0.5"></label>
+        <label>下へずらす（mm）<input type="number" id="oDY" min="-20" max="20" step="0.5"></label>
+      </div>
+      <div class="rowbtn"><button class="btn" id="btnTestPrint">テスト印刷</button><button class="btn" id="btnOffReset">補正をなしにする</button></div>
+      <p class="hint">左や上へずらすときはマイナスの数を入れます。補正は印刷とPDFの両方に効きます。このパソコンのブラウザに覚えておくので、設定ファイルには入りません。</p>
     </section>
 
     <section class="pane" id="tab-items" hidden>
@@ -299,13 +309,26 @@ ul.items .m{font-size:11px;color:var(--muted)}
         <div class="listhead"><h3>文字枠</h3><button class="btn primary sm" id="btnAdd">＋ 文字枠を追加</button></div>
         <ul class="items" id="items"></ul>
         <p class="hint">用紙の上の枠をクリックすると、ここで中身と書式を変えられます。ドラッグで移動、角をつまむと大きさを変えられます。</p>
+        <h3>日付</h3>
+        <div class="grid2" style="align-items:end">
+          <label><span class="field">{{今日}}</span> に入る日付<input type="date" id="dDate"></label>
+          <button class="btn" id="btnDateToday" style="height:34px">今日の日付にする</button>
+        </div>
+        <p class="hint" id="dDateInfo"></p>
       </div>
       <div id="props" hidden style="display:flex;flex-direction:column;gap:12px">
         <button class="back" id="btnBack">← 文字枠の一覧</button>
         <label for="iText">入れる文字</label>
         <textarea id="iText" rows="3" style="margin-top:-8px"></textarea>
         <div class="chips" id="chips"></div>
-        <p class="hint">押すと名簿の列が入ります。<span class="field">{{列名}}</span> の部分が1人ずつ置き換わります。<span class="field">{{列名:漢数字}}</span> と書くと数字を漢数字にします。</p>
+        <p class="hint">押すと名簿の列が入ります。<span class="field">{{列名}}</span> の部分が1人ずつ置き換わります。</p>
+        <details class="paste"><summary>書き方（書式）の一覧</summary>
+          <p class="hint"><span class="field">{{列名:漢数字}}</span> 12 → 十二 ／ <span class="field">{{列名:漢数字位なし}}</span> 12 → 一二<br>
+          <span class="field">{{列名:和暦}}</span> 2026/9/27 → 令和8年9月27日 ／ <span class="field">{{列名:西暦}}</span> → 2026年9月27日<br>
+          <span class="field">{{郵便番号:1桁目}}</span> 123-4567 の1けた目（1）<br>
+          <span class="field">{{列名:和暦:漢数字}}</span> のように「:」でつなげて重ねられます。<br>
+          <span class="field">{{今日}}</span> は「文字枠」の一覧で決めた日付になります。</p>
+        </details>
         <div class="grid2">
           <label>書体<select id="iFont" data-prop="font"></select></label>
           <label>大きさ（pt）<input type="number" id="iSize" data-prop="size" min="4" max="400" step="0.5"></label>
@@ -326,6 +349,8 @@ ul.items .m{font-size:11px;color:var(--muted)}
           <label>行間（倍）<input type="number" id="iLH" data-prop="lh" min="0.8" max="4" step="0.1"></label>
           <label>字間（文字幅の倍）<input type="number" id="iLS" data-prop="ls" min="-0.3" max="4" step="0.05"></label>
         </div>
+        <label class="check"><input type="checkbox" id="iSkip" data-prop="skipEmpty"> 名簿の列が空の行は詰める</label>
+        <p class="hint" style="margin-top:-8px">住所2や役職が空の人は、その行を消して上に詰めます。</p>
         <span class="lbl">枠線</span>
         <div class="seg" data-prop="border"><button data-v="none">なし</button><button data-v="thin">細線</button><button data-v="thick">太線</button><button data-v="double">二重線</button></div>
         <span class="lbl">位置と大きさ（mm・1面の左上から）</span>
@@ -811,25 +836,25 @@ const SPECIAL=['連番','今日'];
 
 /* ---------- sample data ---------- */
 const SAMPLE=[
- ['番号','氏名','ふりがな','学校名','学科','学年','部門','賞'],
- ['1','高橋 陽菜','たかはし ひな','みどり野農業高等学校','食品科学科','3','意見発表 区分Ⅰ類','最優秀賞'],
- ['2','村上 蒼真','むらかみ そうま','東山農林高等学校','生物生産科','2','意見発表 区分Ⅱ類','優秀賞'],
- ['3','岡田 結衣','おかだ ゆい','港南総合高等学校','園芸科学科','3','プロジェクト発表 区分Ⅰ類','優秀賞'],
- ['4','佐伯 大和','さえき やまと','みどり野農業高等学校','生物工学科','1','農業鑑定競技 食品部門','最優秀賞'],
- ['5','越智 美咲','おち みさき','東山農林高等学校','森林環境科','2','農業鑑定競技 林業部門','優良賞'],
- ['6','渡部 颯太','わたなべ そうた','港南総合高等学校','農業土木科','3','平板測量競技','優秀賞'],
- ['7','菅 心春','すが こはる','みどり野農業高等学校','食品科学科','2','意見発表 区分Ⅲ類','優良賞'],
- ['8','二宮 悠斗','にのみや ゆうと','東山農林高等学校','生物生産科','3','プロジェクト発表 区分Ⅱ類','最優秀賞'],
- ['9','矢野 さくら','やの さくら','みどり野農業高等学校','園芸科学科','1','農業鑑定競技 園芸部門','優秀賞'],
- ['10','宇都宮 健太郎','うつのみや けんたろう','港南総合高等学校','生物工学科','2','農業鑑定競技 生物工学部門','優良賞'],
- ['11','久保 凛','くぼ りん','東山農林高等学校','森林環境科','1','意見発表 区分Ⅰ類','優良賞'],
- ['12','松本 あおい','まつもと あおい','みどり野農業高等学校','食品科学科','3','プロジェクト発表 区分Ⅲ類','優秀賞']
+ ['番号','氏名','ふりがな','学校名','学科','学年','部門','賞','郵便番号','住所1','住所2'],
+ ['1','高橋 陽菜','たかはし ひな','みどり野農業高等学校','食品科学科','3','意見発表 区分Ⅰ類','最優秀賞','123-0041','みどり野市中央町2-14-3',''],
+ ['2','村上 蒼真','むらかみ そうま','東山農林高等学校','生物生産科','2','意見発表 区分Ⅱ類','優秀賞','123-0215','みどり野市東山1-8','東山ハイツ201'],
+ ['3','岡田 結衣','おかだ ゆい','港南総合高等学校','園芸科学科','3','プロジェクト発表 区分Ⅰ類','優秀賞','124-0032','港南市浜風町3-5-12',''],
+ ['4','佐伯 大和','さえき やまと','みどり野農業高等学校','生物工学科','1','農業鑑定競技 食品部門','最優秀賞','123-0041','みどり野市中央町5-1-20','グリーンコート102'],
+ ['5','越智 美咲','おち みさき','東山農林高等学校','森林環境科','2','農業鑑定競技 林業部門','優良賞','123-0233','みどり野市東山台4-22',''],
+ ['6','渡部 颯太','わたなべ そうた','港南総合高等学校','農業土木科','3','平板測量競技','優秀賞','124-0017','港南市汐見2-7-9',''],
+ ['7','菅 心春','すが こはる','みどり野農業高等学校','食品科学科','2','意見発表 区分Ⅲ類','優良賞','123-0056','みどり野市若葉町10-3',''],
+ ['8','二宮 悠斗','にのみや ゆうと','東山農林高等学校','生物生産科','3','プロジェクト発表 区分Ⅱ類','最優秀賞','123-0201','みどり野市東山6-11-2','サンライズ東山305'],
+ ['9','矢野 さくら','やの さくら','みどり野農業高等学校','園芸科学科','1','農業鑑定競技 園芸部門','優秀賞','123-0063','みどり野市桜台1-3-15',''],
+ ['10','宇都宮 健太郎','うつのみや けんたろう','港南総合高等学校','生物工学科','2','農業鑑定競技 生物工学部門','優良賞','124-0045','港南市青葉ヶ丘3-18-6',''],
+ ['11','久保 凛','くぼ りん','東山農林高等学校','森林環境科','1','意見発表 区分Ⅰ類','優良賞','123-0228','みどり野市東山台2-9-1',''],
+ ['12','松本 あおい','まつもと あおい','みどり野農業高等学校','食品科学科','3','プロジェクト発表 区分Ⅲ類','優秀賞','123-0041','みどり野市中央町8-2-7','中央マンション502']
 ];
 
 /* ---------- templates ---------- */
 let UID=1; const uid=()=>'i'+(UID++)+Math.random().toString(36).slice(2,6);
-function item(o){return Object.assign({id:uid(),x:10,y:10,w:60,h:15,text:'',font:'gothic',size:14,bold:false,color:'#111111',vertical:false,align:'start',valign:'center',fit:'shrink',lh:1.5,ls:0,border:'none'},o);}
-function baseTpl(){return {name:'',paper:{size:'A4',orient:'portrait',cw:210,ch:297},layout:{cols:1,rows:1,mt:0,mb:0,ml:0,mr:0,gx:0,gy:0,start:1,cut:false},bg:{src:null,print:true,alpha:1},items:[]};}
+function item(o){return Object.assign({id:uid(),x:10,y:10,w:60,h:15,text:'',font:'gothic',size:14,bold:false,color:'#111111',vertical:false,align:'start',valign:'center',fit:'shrink',lh:1.5,ls:0,border:'none',skipEmpty:true},o);}
+function baseTpl(){return {name:'',paper:{size:'A4',orient:'portrait',cw:210,ch:297},date:'',layout:{cols:1,rows:1,mt:0,mb:0,ml:0,mr:0,gx:0,gy:0,start:1,cut:false},bg:{src:null,print:true,alpha:1},items:[]};}
 const TEMPLATES={
  award(){const t=baseTpl();t.name='賞状';t.paper.orient='landscape';
   const M={font:'mincho',vertical:true,color:'#111111'};
@@ -863,6 +888,16 @@ const TEMPLATES={
    item({...M,x:50,y:155,w:120,h:22,text:'部　門　　{{部門}}\n成　績　　{{賞}}',size:14,lh:1.8,valign:'start'}),
    item({...M,x:150,y:188,w:40,h:8,text:'以上',size:12,align:'end'})
   ];return t;},
+ hagaki(){const t=baseTpl();t.name='はがき宛名';t.paper.size='HAGAKI';
+  // 郵便番号枠：上端から12mm、枠は幅5.7mm×高さ8mm（日本郵便の規格に合わせた位置）
+  const ZX=[44.0,51.0,58.0,65.6,72.4,79.2,86.0];
+  t.items=ZX.map((x,i)=>item({x,y:12,w:5.7,h:8,text:`{{郵便番号:${i+1}桁目}}`,font:'gothic',size:14,align:'center',fit:'none'}));
+  const M={font:'mincho',vertical:true};
+  t.items.push(
+   item({...M,x:76,y:26,w:17,h:96,text:'{{住所1:漢数字位なし}}\n　　　{{住所2:漢数字位なし}}',size:15,lh:1.4,align:'start',valign:'start'}),
+   item({...M,x:38,y:34,w:24,h:92,text:'{{氏名}}　様',size:30,align:'start',fit:'condense'}),
+   item({...M,x:7,y:78,w:18,h:60,text:'みどり野市本町一ー二ー三\n学校農業クラブ連盟事務局',size:9,lh:1.5,align:'end',valign:'end'})
+  );return t;},
  blank(){const t=baseTpl();t.name='白紙';t.items=[item({x:20,y:130,w:170,h:30,text:'{{氏名}}',size:36,align:'center',font:'mincho'})];return t;}
 };
 
@@ -871,6 +906,10 @@ let tpl=TEMPLATES.award();
 let bgImg=null;
 const data={name:'サンプル名簿（架空の生徒）',raw:SAMPLE,headers:[],rows:[],sel:[],book:null};
 const ui={view:'cell',rec:0,page:0,zoomMul:1,sel:null,tab:'data'};
+/* 印刷位置の補正はプリンタごとの値なので、設定ファイルではなくこのブラウザに覚える */
+const OFF_KEY='sashikomi-offset';
+const off={dx:0,dy:0};
+try{const o=JSON.parse(localStorage.getItem(OFF_KEY)||'{}');off.dx=+o.dx||0;off.dy=+o.dy||0;}catch(e){}
 
 /* ---------- helpers ---------- */
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -890,23 +929,47 @@ const KD='〇一二三四五六七八九';
 function kanjiNum(s){let n=parseInt(s,10);if(isNaN(n))return s;if(n===0)return '〇';if(n>=10000)return String(n).split('').map(d=>KD[d]).join('');let o='';for(const [u,c] of [[1000,'千'],[100,'百'],[10,'十']]){const q=Math.floor(n/u);if(q){o+=(q>1?KD[q]:'')+c;n%=u;}}if(n)o+=KD[n];return o;}
 const toHalf=s=>s.replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
 const toFull=s=>s.replace(/[!-~]/g,c=>String.fromCharCode(c.charCodeAt(0)+0xFEE0)).replace(/ /g,'　');
+/* dates: 2026/9/27, 2026-09-27, 2026年9月27日 など */
+const ERAS=[['令和',2019,5,1],['平成',1989,1,8],['昭和',1926,12,25],['大正',1912,7,30],['明治',1868,1,25]];
+function parseDate(v){const m=toHalf(String(v)).trim().match(/^(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})\s*日?$/);if(!m)return null;const y=+m[1],mo=+m[2],d=+m[3];if(mo<1||mo>12||d<1||d>31)return null;return {y,m:mo,d};}
+function fmtWareki(o){const k=o.y*10000+o.m*100+o.d;for(const [e,y,m,d] of ERAS){if(k>=y*10000+m*100+d){const n=o.y-y+1;return `${e}${n===1?'元':n}年${o.m}月${o.d}日`;}}return `${o.y}年${o.m}月${o.d}日`;}
+function issueDate(){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(tpl.date||'');if(m)return {y:+m[1],m:+m[2],d:+m[3]};const d=new Date();return {y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()};}
+const DATE_FILTERS=['和暦','西暦'];
 function applyFilter(v,f){
   f=f.trim();
   if(f==='漢数字')return toHalf(v).replace(/[0-9]+/g,kanjiNum);
   if(f==='漢数字位なし'||f==='漢数字（位なし）')return toHalf(v).replace(/[0-9]/g,d=>KD[d]);
   if(f==='全角')return toFull(v);
   if(f==='半角')return toHalf(v);
+  if(f==='和暦'||f==='西暦'){const o=parseDate(v);if(!o)return v;return f==='和暦'?fmtWareki(o):`${o.y}年${o.m}月${o.d}日`;}
+  const k=toHalf(f).match(/^(\d+)桁目$/);if(k)return toHalf(v).replace(/[^0-9]/g,'').charAt(+k[1]-1);
   return v;
 }
-function today(){const d=new Date();const y=d.getFullYear()-2018;return `令和${y===1?'元':y}年${d.getMonth()+1}月${d.getDate()}日`;}
-function subst(text,rec,idx){
+const splitFilters=f=>f?f.split(/[:：]/).map(x=>x.trim()).filter(Boolean):[];
+/* empty: 名簿の値が空のときに返す文字（行を詰める処理の目印に使う） */
+function subst(text,rec,idx,empty){
   return text.replace(FIELD_RE,(m,name,filt)=>{
-    let v;
+    let v,fs=splitFilters(filt);
     if(name==='連番'){if(idx==null)return m;v=String(idx+1);}
-    else if(name==='今日')v=today();
+    else if(name==='今日'){const o=issueDate();v=`${o.y}/${o.m}/${o.d}`;if(!fs.some(f=>DATE_FILTERS.includes(f)))fs.unshift('和暦');}
     else{if(!rec)return m;const k=colIndex(name);if(k<0)return m;v=rec[k]==null?'':String(rec[k]);}
-    return filt?applyFilter(v,filt):v;
+    for(const f of fs)v=applyFilter(v,f);
+    return v===''&&empty!=null?empty:v;
   });
+}
+/* 差し込む列がすべて空の行は行ごと消し、一部だけ空なら隣の空白も詰める */
+const EMPTY='\u0001';
+function substItem(it,rec,idx){
+  if(!it.skipEmpty||!rec)return subst(it.text,rec,idx);
+  const out=[];
+  for(const line of it.text.split('\n')){
+    const n=[...line.matchAll(FIELD_RE)].length;
+    const r=subst(line,rec,idx,EMPTY);
+    if(!r.includes(EMPTY)){out.push(r);continue;}
+    if(n>0&&r.split(EMPTY).length-1===n)continue;
+    out.push(r.replace(new RegExp(`[ 　]*${EMPTY}$`),'').replace(new RegExp(`${EMPTY}[ 　]*`,'g'),''));
+  }
+  return out.join('\n');
 }
 function usedFields(){const s=new Set();for(const it of tpl.items){for(const m of it.text.matchAll(FIELD_RE))s.add(m[1]);}return [...s];}
 function missingFields(){return usedFields().filter(f=>!SPECIAL.includes(f)&&colIndex(f)<0);}
@@ -925,6 +988,8 @@ function unitsV(p,it){
       else for(const ch of run)out.push({ch:toFull(ch),t:'n',a:1});
       i=j;continue;}
     let t='n',a=1;
+    // 住所の「1-2-3」などのハイフンは、縦書きでは長い縦線（ー）にする
+    if('-－‐−'.includes(c)){out.push({ch:'ー',t:'r',a:1});i++;continue;}
     if(c===' '){a=0.5;}
     else if(ROT.includes(c))t='r';
     else if(PUNCT.includes(c))t='p';
@@ -1005,12 +1070,13 @@ function renderCell(ctx,ox,oy,s,rec,idx,mode){
   const [cw,ch]=cellWH();
   ctx.save();ctx.beginPath();ctx.rect(ox,oy,cw*s,ch*s);ctx.clip();
   if(bgImg&&(mode==='screen'||tpl.bg.print)){ctx.globalAlpha=tpl.bg.alpha*(mode==='screen'&&!tpl.bg.print?0.4:1);ctx.drawImage(bgImg,ox,oy,cw*s,ch*s);ctx.globalAlpha=1;}
-  for(const it of tpl.items)drawItem(ctx,it,subst(it.text,rec,idx),ox,oy,s);
+  for(const it of tpl.items)drawItem(ctx,it,substItem(it,rec,idx),ox,oy,s);
   ctx.restore();
 }
 function renderPage(ctx,p,s,mode){
   const [W,H]=paperWH(),[cw,ch]=cellWH(),per=perPage(),recs=records(),n=recs.length,start=clamp(tpl.layout.start,1,per)-1;
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W*s,H*s);
+  ctx.save();if(mode==='out')ctx.translate(off.dx*s,off.dy*s);
   for(let k=0;k<per;k++){
     const [x,y]=cellOrigin(k);const slot=p*per+k,r=slot-start;
     if(mode==='screen'&&per>1){ctx.save();ctx.strokeStyle='#c9d1dc';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(x*s+.5,y*s+.5,cw*s-1,ch*s-1);ctx.restore();}
@@ -1019,6 +1085,23 @@ function renderPage(ctx,p,s,mode){
     if(mode==='out'&&tpl.layout.cut&&per>1&&(n===0||(r>=0&&r<n))){ctx.save();ctx.strokeStyle='#9aa0a8';ctx.lineWidth=Math.max(1,0.2*s);ctx.setLineDash([2*s,1.5*s]);ctx.strokeRect(x*s,y*s,cw*s,ch*s);ctx.restore();}
   }
   if(mode==='screen'&&tpl.layout.cut&&per>1){ctx.save();ctx.strokeStyle='#8b95a3';ctx.lineWidth=1;ctx.setLineDash([6,4]);for(let k=0;k<per;k++){const [x,y]=cellOrigin(k);ctx.strokeRect(x*s+.5,y*s+.5,cw*s-1,ch*s-1);}ctx.restore();}
+  ctx.restore();
+}
+/* 位置合わせ用のテストページ：四隅から20mmの十字と中央の十字 */
+function renderTestPage(ctx,s){
+  const [W,H]=paperWH(),m=20,L=6;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W*s,H*s);
+  ctx.save();ctx.translate(off.dx*s,off.dy*s);
+  ctx.strokeStyle='#000';ctx.fillStyle='#000';ctx.lineWidth=Math.max(1,0.2*s);
+  const cross=(x,y)=>{ctx.beginPath();ctx.moveTo((x-L)*s,y*s);ctx.lineTo((x+L)*s,y*s);ctx.moveTo(x*s,(y-L)*s);ctx.lineTo(x*s,(y+L)*s);ctx.stroke();ctx.beginPath();ctx.arc(x*s,y*s,2*s,0,Math.PI*2);ctx.stroke();};
+  const fs=Math.min(3.2,W/60);ctx.font=`400 ${fs*s}px ${FONTS.gothic.css}`;ctx.textBaseline='top';
+  const pts=[[m,m,'left'],[W-m,m,'right'],[m,H-m,'left'],[W-m,H-m,'right']];
+  for(const [x,y,al] of pts){cross(x,y);ctx.textAlign=al;const tx=al==='left'?x-2:x+2,ty=y<H/2?y+L+1.5:y-L-1.5-fs*2.6;
+    ctx.fillText(`${al==='left'?'左':'右'}端から${m}mm`,tx*s,ty*s);ctx.fillText(`${y<H/2?'上':'下'}端から${m}mm`,tx*s,(ty+fs*1.3)*s);}
+  cross(W/2,H/2);
+  ctx.textAlign='center';const lines=['位置合わせ用のテストページ','左上の十字の中心から、紙の左端と上端までを定規で測ります。',`どちらも${m}mmなら補正は要りません。`,`左端から${m+2}mmだったら「右へずらす」に −2、`,`上端から${m-1}mmだったら「下へずらす」に 1 を入れます。`,`いまの補正：右へ ${off.dx}mm ／ 下へ ${off.dy}mm`];
+  const y0=H/2+L+4;lines.forEach((t,i)=>{if(i===0)ctx.font=`700 ${fs*1.2*s}px ${FONTS.gothic.css}`;else ctx.font=`400 ${fs*s}px ${FONTS.gothic.css}`;ctx.fillText(t,W/2*s,(y0+i*fs*1.6)*s);});
+  ctx.restore();
 }
 
 /* ---------- fonts ---------- */
@@ -1027,7 +1110,7 @@ async function ensureFonts(recIdxs){
   const recs=records();const need=new Map();
   for(const it of tpl.items){const k=it.font+'|'+(it.bold?700:400);const set=need.get(k)||new Set();
     const list=recIdxs.length?recIdxs:[null];
-    for(const i of list){for(const ch of subst(it.text,i==null?null:recs[i],i))set.add(ch);}
+    for(const i of list){for(const ch of substItem(it,i==null?null:recs[i],i))set.add(ch);}
     need.set(k,set);}
   const ps=[];for(const [k,set] of need){const [f,w]=k.split('|');ps.push(document.fonts.load(`${w} 24px "${FONTS[f].web}"`,[...set].join('')||'あ').catch(()=>{}));}
   await Promise.race([Promise.all(ps),new Promise(r=>setTimeout(r,5000))]);
@@ -1088,6 +1171,8 @@ function updateStatus(){
   const orient=W>H?'横':'縦';
   const parts=[`${n}件を印刷`,`${PAPER_LABEL[tpl.paper.size]}${orient}・${per}面`,`${pageCount(n)}ページ`];
   let html=parts.map(p=>`<span>${p}</span>`).join('');
+  if(usedFields().includes('今日')){const o=issueDate();html+=`<span>日付 ${fmtWareki(o)}${tpl.date?'（指定）':'（今日）'}</span>`;}
+  if(off.dx||off.dy)html+=`<span class="w">印刷位置を補正中（右へ${off.dx}mm・下へ${off.dy}mm）</span>`;
   const miss=missingFields();
   if(miss.length&&data.headers.length)html+=`<span class="w">名簿に見つからない列：${miss.map(esc).join('、')}</span>`;
   $('#status').innerHTML=html;
@@ -1152,7 +1237,7 @@ async function loadDataFile(file){
   const buf=await file.arrayBuffer();
   if(/\.(xlsx|xlsm|xls|ods)$/i.test(file.name)){
     if(!window.XLSX){toast('Excelを読み込む部品が見つかりません。CSVで保存して読み込んでください');return;}
-    const wb=XLSX.read(buf,{type:'array'});data.book=wb;
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});data.book=wb;
     const sel=$('#sheetSel');sel.innerHTML=wb.SheetNames.map((n,i)=>`<option value="${i}">${esc(n)}</option>`).join('');
     $('#sheetRow').hidden=wb.SheetNames.length<2;
     loadSheet(0,file.name);
@@ -1165,6 +1250,8 @@ async function loadDataFile(file){
 }
 function loadSheet(i,fname){
   const wb=data.book;const ws=wb.Sheets[wb.SheetNames[i]];
+  // 日付のセルは「9/27/26」のような表示になるので、年を4桁で持つ形にそろえる（時刻だけのセルはそのまま）
+  for(const k in ws){const c=ws[k];if(k[0]!=='!'&&c&&c.t==='d'&&c.v instanceof Date&&c.v.getFullYear()>1900&&!/:/.test(c.w||''))c.w=`${c.v.getFullYear()}/${c.v.getMonth()+1}/${c.v.getDate()}`;}
   const m=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:'',blankrows:false}).filter(r=>r.some(v=>String(v).trim()!==''));
   setMatrix(m,(fname||data.name.split('｜')[0])+'｜'+wb.SheetNames[i]);
   toast(`シート「${wb.SheetNames[i]}」から${data.rows.length}件を読み込みました`);
@@ -1192,7 +1279,14 @@ function syncPaper(){
   $$('#quickLayout button').forEach(b=>b.classList.toggle('on',+b.dataset.c===L.cols&&+b.dataset.r===L.rows));
   const [cw,ch]=cellWH();$('#cellInfo').textContent=`1面の大きさ ${r1(cw)} × ${r1(ch)} mm ／ 1枚に${perPage()}件`;
   $('#bgPrint').checked=tpl.bg.print;$('#bgAlpha').value=tpl.bg.alpha;$('#btnBgDel').disabled=!tpl.bg.src;
+  $('#oDX').value=off.dx;$('#oDY').value=off.dy;
 }
+function syncDate(){$('#dDate').value=tpl.date||'';$('#dDateInfo').textContent=tpl.date?`${fmtWareki(issueDate())} で印刷します。設定を保存すると、この日付も保存されます。`:`指定しないときは、印刷する日の日付（いまは ${fmtWareki(issueDate())}）が入ります。`;}
+$('#dDate').addEventListener('change',e=>{tpl.date=/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)?e.target.value:'';syncDate();requestRender();commit();});
+$('#btnDateToday').addEventListener('click',()=>{tpl.date='';syncDate();requestRender();commit();});
+function saveOff(){try{localStorage.setItem(OFF_KEY,JSON.stringify(off));}catch(e){}updateStatus();}
+[['#oDX','dx'],['#oDY','dy']].forEach(([id,k])=>{const el=$(id);el.addEventListener('input',()=>{const v=parseFloat(el.value);if(isNaN(v))return;off[k]=clamp(Math.round(v*10)/10,-20,20);saveOff();});el.addEventListener('change',()=>{el.value=off[k];});});
+$('#btnOffReset').addEventListener('click',()=>{off.dx=off.dy=0;saveOff();syncPaper();toast('印刷位置の補正をなしにしました');});
 $('#pSize').addEventListener('change',e=>{tpl.paper.size=e.target.value;if(e.target.value==='CUSTOM'){const [w,h]=paperWH();tpl.paper.cw=Math.min(w,h);tpl.paper.ch=Math.max(w,h);}syncPaper();requestRender();commit();});
 $('#pOrient').addEventListener('click',e=>{const v=e.target.dataset.v;if(!v)return;tpl.paper.orient=v;syncPaper();requestRender();commit();});
 [['#pCW','cw'],['#pCH','ch']].forEach(([id,k])=>{const el=$(id);el.addEventListener('input',()=>{const v=parseFloat(el.value);if(v>=30){tpl.paper[k]=v;syncPaperInfo();requestRender();}});el.addEventListener('change',commit);});
@@ -1226,7 +1320,7 @@ function renderItemList(){
 }
 $('#items').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(b){if(ui.view!=='cell'){ui.view='cell';}select(b.dataset.id);requestRender();}});
 function renderChips(){
-  $('#chips').innerHTML=data.headers.map(h=>`<button class="chip" data-f="${esc(h)}">${esc(h)}</button>`).join('')+SPECIAL.map(h=>`<button class="chip sys" data-f="${h}" title="${h==='連番'?'1から順に番号':'今日の日付（令和）'}">${h}</button>`).join('');
+  $('#chips').innerHTML=data.headers.map(h=>`<button class="chip" data-f="${esc(h)}">${esc(h)}</button>`).join('')+SPECIAL.map(h=>`<button class="chip sys" data-f="${h}" title="${h==='連番'?'1から順に番号':'日付（令和）。文字枠の一覧で日付を指定できます'}">${h}</button>`).join('');
 }
 $('#chips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const ta=$('#iText');const ins=`{{${b.dataset.f}}}`;
   const s=ta.selectionStart??ta.value.length,en=ta.selectionEnd??ta.value.length;ta.value=ta.value.slice(0,s)+ins+ta.value.slice(en);ta.focus();ta.selectionStart=ta.selectionEnd=s+ins.length;
@@ -1237,7 +1331,7 @@ function syncItems(){
   renderItemList();
   if(!it)return;
   if(document.activeElement!==$('#iText'))$('#iText').value=it.text;
-  $('#iFont').value=it.font;$('#iSize').value=it.size;$('#iBold').checked=it.bold;$('#iColor').value=it.color;
+  $('#iFont').value=it.font;$('#iSize').value=it.size;$('#iBold').checked=it.bold;$('#iSkip').checked=!!it.skipEmpty;$('#iColor').value=it.color;
   $('#iLH').value=it.lh;$('#iLS').value=it.ls;
   syncGeom();
   $$('#props .seg').forEach(seg=>{const k=seg.dataset.prop;seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',String(it[k])===b.dataset.v));});
@@ -1345,7 +1439,7 @@ $('#btnLoadTpl').addEventListener('click',()=>$('#fileTpl').click());
 $('#fileTpl').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadTplFile(f);e.target.value='';});
 async function loadTplFile(f){try{const j=JSON.parse(await f.text());const t=j.template||j;if(!t.items||!t.paper)throw 0;tpl=normalize(t);ui.sel=null;setBgImage();syncAll();commit();toast(`設定「${f.name}」を開きました`);}catch(err){toast('このファイルは差し込み工房の設定ではないようです');}}
 function normalize(t){const b=baseTpl();const o={...b,...t,paper:{...b.paper,...t.paper},layout:{...b.layout,...t.layout},bg:{...b.bg,...(t.bg||{})}};o.items=(t.items||[]).map(i=>item({...i,id:i.id||uid()}));return o;}
-function syncAll(){syncPaper();syncItems();renderChips();requestRender();}
+function syncAll(){syncPaper();syncItems();syncDate();renderChips();requestRender();}
 
 /* ---------- output ---------- */
 function progress(show,title,done,total){const m=$('#progress');m.hidden=!show;if(!show)return;$('#progTitle').textContent=title;$('#progBar').style.width=(total?done/total*100:0)+'%';$('#progText').textContent=`${done} / ${total} ページ`;}
@@ -1373,10 +1467,10 @@ $('#btnPdf').addEventListener('click',async()=>{
   }catch(err){console.error(err);toast('PDFの作成に失敗しました。画質を「標準」にして試してください');}
   progress(false);
 });
-$('#btnPrint').addEventListener('click',async()=>{
+async function printWith(produce){
   const area=$('#printArea');area.innerHTML='';const [W,H]=paperWH();const urls=[];
   try{
-    const ok=await renderAllPages(async c=>{const blob=await new Promise(r=>c.toBlob(r,'image/png'));const u=URL.createObjectURL(blob);urls.push(u);const im=new Image();im.src=u;im.style.width=W+'mm';im.style.height=H+'mm';area.append(im);});
+    const ok=await produce(async c=>{const blob=await new Promise(r=>c.toBlob(r,'image/png'));const u=URL.createObjectURL(blob);urls.push(u);const im=new Image();im.src=u;im.style.width=W+'mm';im.style.height=H+'mm';area.append(im);});
     if(!ok){progress(false);return;}
     await Promise.all([...area.images||area.querySelectorAll('img')].map(im=>im.decode?im.decode().catch(()=>{}):null));
   }catch(err){console.error(err);progress(false);toast('印刷の準備に失敗しました');return;}
@@ -1385,7 +1479,12 @@ $('#btnPrint').addEventListener('click',async()=>{
   const clean=()=>{area.innerHTML='';urls.forEach(u=>URL.revokeObjectURL(u));window.removeEventListener('afterprint',clean);};
   window.addEventListener('afterprint',clean);
   setTimeout(()=>window.print(),50);
-});
+}
+$('#btnPrint').addEventListener('click',()=>printWith(renderAllPages));
+$('#btnTestPrint').addEventListener('click',()=>printWith(async onPage=>{
+  if(document.fonts&&document.fonts.load)await document.fonts.load(`400 24px "${FONTS.gothic.web}"`,'位置合わせ').catch(()=>{});
+  const s=200/25.4,[W,H]=paperWH();const c=document.createElement('canvas');c.width=Math.round(W*s);c.height=Math.round(H*s);
+  renderTestPage(c.getContext('2d'),s);await onPage(c,0,1);return true;}));
 
 /* ---------- boot ---------- */
 (function boot(){
